@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hackathon Topic Selector</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0B0F17;
+            color: #F3F4F6;
+        }
+
+        .heading-font {
+            font-family: 'Space+Grotesk', sans-serif;
+        }
+
+        /* Glassmorphism effects */
+        .glass-card {
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-input {
+            background: rgba(31, 41, 55, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .glass-input:focus {
+            border-color: #6366F1;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Wheel Pointer Animation */
+        @keyframes pulse-pointer {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        .pointer-bounce {
+            animation: pulse-pointer 1s infinite ease-in-out;
+        }
+
+        /* Stage Glow Highlights */
+        .glow-purple {
+            box-shadow: 0 0 50px -10px rgba(168, 85, 247, 0.4);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 50px -10px rgba(6, 182, 212, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950">
+
+    <!-- Header / Branding -->
+    <header class="w-full py-6 px-8 border-b border-gray-800/60 bg-gray-950/40 backdrop-blur-md flex justify-between items-center z-10">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30">
+                <i data-lucide="zap" class="w-7 h-7 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold heading-font tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-200 to-cyan-400">
+                    STAGE SELECTOR
+                </h1>
+                <p class="text-xs text-indigo-400/80 tracking-wider uppercase font-semibold">Hackathon Edition</p>
+            </div>
+        </div>
+
+        <!-- Top Right Control Badges -->
+        <div class="flex items-center gap-4">
+            <button onclick="toggleConfigModal()" class="flex items-center gap-2 px-4 py-2 text-sm bg-gray-800/80 hover:bg-gray-700 text-gray-300 rounded-xl border border-gray-700/50 transition duration-200">
+                <i data-lucide="settings" class="w-4 h-4"></i> Setup Topics
+            </button>
+            <div class="px-4 py-2 bg-indigo-950/80 border border-indigo-800/50 rounded-xl text-sm font-semibold text-indigo-300">
+                Teams Assigned: <span id="progressBadge" class="text-white text-base">0 / 15</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN INTERFACE CONTAINER -->
+    <main class="container mx-auto px-4 py-6 flex-grow flex items-center justify-center">
+
+        <!-- 1. SELECTION / STAGE WHEEL VIEW -->
+        <section id="stageView" class="w-full max-w-4xl flex flex-col items-center">
+            
+            <!-- Active Team Entry Bar -->
+            <div class="w-full glass-card p-6 rounded-3xl mb-8 border border-indigo-500/20 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400"></div>
+                <label for="teamNameInput" class="block text-indigo-300 text-sm font-semibold uppercase tracking-widest mb-2">
+                    Enter Team Name to Step Up
+                </label>
+                <input type="text" id="teamNameInput" placeholder="e.g. Code Warriors" 
+                    class="w-full max-w-lg text-center text-2xl font-bold py-3 px-6 rounded-2xl glass-input text-white placeholder-gray-500 focus:outline-none transition duration-300">
+            </div>
+
+            <!-- Spinning Wheel Block -->
+            <div class="relative flex flex-col items-center justify-center my-2">
+                <!-- Pointer Indicator -->
+                <div class="z-20 -mb-6 pointer-bounce">
+                    <div class="w-0 h-0 border-l-[18px] border-l-transparent border-r-[18px] border-r-transparent border-t-[32px] border-t-amber-400 filter drop-shadow-[0_4px_10px_rgba(251,191,36,0.6)]"></div>
+                </div>
+
+                <!-- SVG Interactive Wheel Canvas -->
+                <div class="relative rounded-full p-3 bg-gradient-to-b from-gray-800 to-gray-900 border-4 border-gray-700/60 shadow-2xl">
+                    <canvas id="wheelCanvas" width="380" height="380" class="rounded-full cursor-pointer transition-transform duration-300 hover:scale-[1.02]"></canvas>
+                </div>
+
+                <!-- Spin Button -->
+                <button id="spinBtn" onclick="spinWheel()" class="mt-8 px-10 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-extrabold text-xl tracking-wider rounded-2xl shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition duration-200 uppercase flex items-center gap-3">
+                    <i data-lucide="disc" class="w-6 h-6 animate-spin-slow"></i> Spin Topic Wheel
+                </button>
+            </div>
+
+            <!-- Stage Completion Bar (Appears when all teams complete) -->
+            <div id="completionBanner" class="hidden w-full mt-8 p-6 glass-card rounded-3xl border border-emerald-500/40 text-center animate-bounce">
+                <h3 class="text-2xl font-bold text-emerald-400 mb-2">🎉 All Teams Have Selected Their Topics!</h3>
+                <p class="text-gray-300 mb-4">Click below to view the overall distribution and breakdown.</p>
+                <button onclick="showResultsView()" class="px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-lg rounded-xl shadow-lg shadow-emerald-500/30 transition">
+                    Show Final Results & Breakdown
+                </button>
+            </div>
+        </section>
+
+
+        <!-- 2. RESULTS & DASHBOARD VIEW (Hidden initially) -->
+        <section id="resultsView" class="hidden w-full max-w-6xl py-4">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-extrabold heading-font text-white">Hackathon Final Selection Results</h2>
+                    <p class="text-gray-400 text-sm">Graphical summary and complete team roster assignments</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="showStageView()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl border border-gray-700 text-sm font-semibold flex items-center gap-2">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Stage Wheel
+                    </button>
+                    <button onclick="confirmReset()" class="px-4 py-2 bg-red-950/60 hover:bg-red-900/80 text-red-300 rounded-xl border border-red-800/40 text-sm font-semibold flex items-center gap-2">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Repeat / Reset Cycle
+                    </button>
+                </div>
+            </div>
+
+            <!-- Graphical Summary Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Summary Stats Card 1 -->
+                <div class="glass-card p-6 rounded-3xl border-l-4 border-indigo-500 flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs uppercase tracking-wider text-indigo-400 font-bold">Topic 1 Assigned</span>
+                        <h3 id="topic1TitleSummary" class="text-lg font-bold text-white mt-1 truncate">Problem Statement 1</h3>
+                    </div>
+                    <div class="mt-4 flex items-baseline justify-between">
+                        <span id="topic1Count" class="text-5xl font-extrabold text-indigo-400">0</span>
+                        <span class="text-sm text-gray-400">Teams</span>
+                    </div>
+                </div>
+
+                <!-- Summary Stats Card 2 -->
+                <div class="glass-card p-6 rounded-3xl border-l-4 border-cyan-400 flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs uppercase tracking-wider text-cyan-400 font-bold">Topic 2 Assigned</span>
+                        <h3 id="topic2TitleSummary" class="text-lg font-bold text-white mt-1 truncate">Problem Statement 2</h3>
+                    </div>
+                    <div class="mt-4 flex items-baseline justify-between">
+                        <span id="topic2Count" class="text-5xl font-extrabold text-cyan-400">0</span>
+                        <span class="text-sm text-gray-400">Teams</span>
+                    </div>
+                </div>
+
+                <!-- Chart Visualization -->
+                <div class="glass-card p-4 rounded-3xl flex flex-col items-center justify-center">
+                    <div class="w-full h-40">
+                        <canvas id="resultsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Team Roster Table -->
+            <div class="glass-card p-6 rounded-3xl">
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="users" class="w-5 h-5 text-indigo-400"></i> Assigned Roster
+                    </h3>
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-gray-400"></i>
+                        <input type="text" id="searchInput" oninput="filterResults()" placeholder="Search team or topic..." 
+                            class="w-full pl-9 pr-4 py-2 glass-input rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th class="py-3 px-4">#</th>
+                                <th class="py-3 px-4">Team Name</th>
+                                <th class="py-3 px-4">Assigned Problem Statement</th>
+                                <th class="py-3 px-4 text-right">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody" class="divide-y divide-gray-800/50 text-sm">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Winner Result Modal Popup -->
+    <div id="resultModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="glass-card max-w-md w-full p-8 rounded-3xl border border-indigo-500/40 text-center transform transition duration-300 scale-95 glow-purple">
+            <div class="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-500/30">
+                <i data-lucide="award" class="w-8 h-8"></i>
+            </div>
+            <h4 id="modalTeamName" class="text-xl font-bold text-gray-300 uppercase tracking-widest">Team Name</h4>
+            <p class="text-xs text-gray-400 mb-2">has been assigned to</p>
+            
+            <div class="py-4 my-2 bg-indigo-950/60 rounded-2xl border border-indigo-800/50">
+                <h3 id="modalTopicTitle" class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-white to-cyan-300 px-4">
+                    Problem Statement
+                </h3>
+            </div>
+
+            <button onclick="closeResultModal()" class="mt-6 w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition">
+                Confirm & Next Team
+            </button>
+        </div>
+    </div>
+
+    <!-- Configuration Modal Popup -->
+    <div id="configModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="glass-card max-w-lg w-full p-6 rounded-3xl border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-5 h-5 text-indigo-400"></i> Event Setup
+                </h3>
+                <button onclick="toggleConfigModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-indigo-300 uppercase mb-1">Problem Statement 1</label>
+                    <input type="text" id="configTopic1" class="w-full py-2 px-4 glass-input rounded-xl text-white focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-cyan-300 uppercase mb-1">Problem Statement 2</label>
+                    <input type="text" id="configTopic2" class="w-full py-2 px-4 glass-input rounded-xl text-white focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 uppercase mb-1">Total Number of Teams</label>
+                    <input type="number" id="configTotalTeams" min="1" max="100" class="w-full py-2 px-4 glass-input rounded-xl text-white focus:outline-none">
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button onclick="toggleConfigModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm">Cancel</button>
+                <button onclick="saveConfiguration()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full py-4 text-center text-xs text-gray-500 border-t border-gray-900 bg-gray-950/60">
+        Stage Selection System &bull; Ready for High-Resolution Projector Displays
+    </footer>
+
+    <!-- Audio Effects (Web Audio Synthesizer - No External Assets Needed) -->
+    <script>
+        // Web Audio Synthesizer for Audio Feedback
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTickSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.04);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.04);
+        }
+
+        function playFanfareSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const freqs = [392, 523.25, 659.25, 783.99]; // C major chord arpeggio
+            freqs.forEach((f, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(f, now + i * 0.1);
+                gain.gain.setValueAtTime(0.2, now + i * 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + i * 0.1);
+                osc.stop(now + i * 0.1 + 0.4);
+            });
+        }
+    </script>
+
+    <!-- Core Application Logic -->
+    <script>
+        // Application State
+        let config = {
+            topic1: "Problem Statement A: AI & Automation",
+            topic2: "Problem Statement B: Sustainability & Web3",
+            totalTeams: 15
+        };
+
+        let teamAssignments = []; // { teamName, topic, timestamp }
+        let currentAngle = 0;
+        let isSpinning = false;
+        let resultsChartInstance = null;
+
+        // Initialize icons & state on page load
+        window.onload = function() {
+            lucide.createIcons();
+            loadStateFromLocalStorage();
+            updateConfigInputs();
+            drawWheel();
+            updateBadge();
+        };
+
+        // --- WHEEL DRAWING & SPIN LOGIC ---
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function drawWheel() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const cx = width / 2;
+            const cy = height / 2;
+            const radius = cx - 10;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Topic 1 Sector (0 to PI radians - Right half)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, radius, currentAngle, currentAngle + Math.PI);
+            ctx.fillStyle = '#4F46E5'; // Indigo
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#1E1B4B';
+            ctx.stroke();
+
+            // Topic 2 Sector (PI to 2*PI radians - Left half)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, radius, currentAngle + Math.PI, currentAngle + 2 * Math.PI);
+            ctx.fillStyle = '#06B6D4'; // Cyan
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#083344';
+            ctx.stroke();
+
+            // Draw Topic 1 Text
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(currentAngle + Math.PI / 2);
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "bold 16px Inter";
+            wrapText(ctx, config.topic1, 0, radius / 2, radius * 0.7, 20);
+            ctx.restore();
+
+            // Draw Topic 2 Text
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(currentAngle + (3 * Math.PI) / 2);
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "bold 16px Inter";
+            wrapText(ctx, config.topic2, 0, radius / 2, radius * 0.7, 20);
+            ctx.restore();
+
+            // Draw Center Pin
+            ctx.beginPath();
+            ctx.arc(cx, cy, 28, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0F172A';
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#F1F5F9';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = '#6366F1';
+            ctx.fill();
+        }
+
+        // Text Wrapping Helper for Canvas
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = '';
+            let lines = [];
+
+            for(let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = context.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            let startY = y - ((lines.length - 1) * lineHeight) / 2;
+            for (let k = 0; k < lines.length; k++) {
+                context.fillText(lines[k], x, startY + (k * lineHeight));
+            }
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+
+            const teamInput = document.getElementById('teamNameInput');
+            const teamName = teamInput.value.trim();
+
+            if (!teamName) {
+                alert("Please enter the Team Name before spinning!");
+                teamInput.focus();
+                return;
+            }
+
+            if (teamAssignments.length >= config.totalTeams) {
+                alert("All team allocations are completed for this round!");
+                return;
+            }
+
+            isSpinning = true;
+            document.getElementById('spinBtn').disabled = true;
+
+            // Determine random rotations (between 5 and 8 full spins + random offset)
+            const randomSector = Math.random(); // 0 to 0.5 = Topic 1 or Topic 2
+            const targetAdditionalAngle = Math.PI * 10 + (randomSector * Math.PI * 2); 
+            const duration = 4000; // 4 seconds spin
+            const startAngle = currentAngle;
+            const startTime = performance.now();
+            let lastSoundAngle = currentAngle;
+
+            function animateSpin(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Cubic Ease-Out curve for realistic deceleration
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                currentAngle = startAngle + (targetAdditionalAngle * easeOut);
+
+                // Trigger audio tick effect when crossing sectors
+                if (currentAngle - lastSoundAngle > Math.PI / 4) {
+                    playTickSound();
+                    lastSoundAngle = currentAngle;
+                }
+
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateSpin);
+                } else {
+                    isSpinning = false;
+                    document.getElementById('spinBtn').disabled = false;
+                    finalizeSpinResult(teamName);
+                }
+            }
+
+            requestAnimationFrame(animateSpin);
+        }
+
+        function finalizeSpinResult(teamName) {
+            // Determine winning segment based on final angle relative to top pointer (270 degrees / 1.5*PI)
+            const normalizedAngle = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+            
+            // Pointer is at 270 degrees (3*PI/2)
+            const pointerAngle = (1.5 * Math.PI - normalizedAngle + 2 * Math.PI) % (2 * Math.PI);
+            
+            let assignedTopic = (pointerAngle >= 0 && pointerAngle < Math.PI) ? config.topic1 : config.topic2;
+
+            // Save record
+            const record = {
+                teamName: teamName,
+                topic: assignedTopic,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            teamAssignments.push(record);
+            saveStateToLocalStorage();
+
+            // Clear Input
+            document.getElementById('teamNameInput').value = '';
+
+            // Sound & Confetti Feedback
+            playFanfareSound();
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+
+            // Display Winner Popup Modal
+            document.getElementById('modalTeamName').innerText = teamName;
+            document.getElementById('modalTopicTitle').innerText = assignedTopic;
+            document.getElementById('resultModal').classList.remove('hidden');
+            document.getElementById('resultModal').classList.add('flex');
+
+            updateBadge();
+        }
+
+        function closeResultModal() {
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('resultModal').classList.remove('flex');
+
+            if (teamAssignments.length >= config.totalTeams) {
+                document.getElementById('completionBanner').classList.remove('hidden');
+            }
+        }
+
+        function updateBadge() {
+            document.getElementById('progressBadge').innerText = `${teamAssignments.length} / ${config.totalTeams}`;
+        }
+
+        // --- VIEWS MANAGEMENT ---
+        function showResultsView() {
+            document.getElementById('stageView').classList.add('hidden');
+            document.getElementById('resultsView').classList.remove('hidden');
+            renderResults();
+        }
+
+        function showStageView() {
+            document.getElementById('resultsView').classList.add('hidden');
+            document.getElementById('stageView').classList.remove('hidden');
+        }
+
+        // --- RESULTS & GRAPHICAL REPRESENTATION ---
+        function renderResults() {
+            const topic1Count = teamAssignments.filter(t => t.topic === config.topic1).length;
+            const topic2Count = teamAssignments.filter(t => t.topic === config.topic2).length;
+
+            document.getElementById('topic1TitleSummary').innerText = config.topic1;
+            document.getElementById('topic2TitleSummary').innerText = config.topic2;
+            document.getElementById('topic1Count').innerText = topic1Count;
+            document.getElementById('topic2Count').innerText = topic2Count;
+
+            renderRosterTable(teamAssignments);
+            renderChart(topic1Count, topic2Count);
+        }
+
+        function renderRosterTable(data) {
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-gray-500">No teams assigned yet.</td></tr>`;
+                return;
+            }
+
+            data.forEach((item, idx) => {
+                const isTopic1 = item.topic === config.topic1;
+                const badgeStyle = isTopic1 
+                    ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/50' 
+                    : 'bg-cyan-950/80 text-cyan-300 border-cyan-700/50';
+
+                const row = `
+                    <tr class="hover:bg-gray-800/30 transition duration-150">
+                        <td class="py-3 px-4 font-bold text-gray-500">${idx + 1}</td>
+                        <td class="py-3 px-4 font-semibold text-white">${item.teamName}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-3 py-1 text-xs font-semibold rounded-lg border ${badgeStyle}">
+                                ${item.topic}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right text-xs text-gray-400">${item.timestamp}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function filterResults() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = teamAssignments.filter(t => 
+                t.teamName.toLowerCase().includes(query) || 
+                t.topic.toLowerCase().includes(query)
+            );
+            renderRosterTable(filtered);
+        }
+
+        function renderChart(count1, count2) {
+            const ctxChart = document.getElementById('resultsChart').getContext('2d');
+
+            if (resultsChartInstance) {
+                resultsChartInstance.destroy();
+            }
+
+            resultsChartInstance = new Chart(ctxChart, {
+                type: 'doughnut',
+                data: {
+                    labels: [config.topic1, config.topic2],
+                    datasets: [{
+                        data: [count1, count2],
+                        backgroundColor: ['#4F46E5', '#06B6D4'],
+                        borderColor: '#0F172A',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- CONFIGURATION MANAGEMENT ---
+        function toggleConfigModal() {
+            const modal = document.getElementById('configModal');
+            modal.classList.toggle('hidden');
+            modal.classList.toggle('flex');
+        }
+
+        function updateConfigInputs() {
+            document.getElementById('configTopic1').value = config.topic1;
+            document.getElementById('configTopic2').value = config.topic2;
+            document.getElementById('configTotalTeams').value = config.totalTeams;
+        }
+
+        function saveConfiguration() {
+            const t1 = document.getElementById('configTopic1').value.trim();
+            const t2 = document.getElementById('configTopic2').value.trim();
+            const num = parseInt(document.getElementById('configTotalTeams').value);
+
+            if (t1) config.topic1 = t1;
+            if (t2) config.topic2 = t2;
+            if (num && num > 0) config.totalTeams = num;
+
+            saveStateToLocalStorage();
+            drawWheel();
+            updateBadge();
+            toggleConfigModal();
+        }
+
+        function confirmReset() {
+            if (confirm("Are you sure you want to reset all team assignments for a new cycle?")) {
+                teamAssignments = [];
+                saveStateToLocalStorage();
+                updateBadge();
+                document.getElementById('completionBanner').classList.add('hidden');
+                showStageView();
+            }
+        }
+
+        // --- PERSISTENCE ---
+        function saveStateToLocalStorage() {
+            localStorage.setItem('hackathon_config', JSON.stringify(config));
+            localStorage.setItem('hackathon_teams', JSON.stringify(teamAssignments));
+        }
+
+        function loadStateFromLocalStorage() {
+            const savedConfig = localStorage.getItem('hackathon_config');
+            const savedTeams = localStorage.getItem('hackathon_teams');
+
+            if (savedConfig) config = JSON.parse(savedConfig);
+            if (savedTeams) teamAssignments = JSON.parse(savedTeams);
+
+            if (teamAssignments.length >= config.totalTeams) {
+                document.getElementById('completionBanner').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
